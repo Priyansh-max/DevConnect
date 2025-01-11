@@ -33,7 +33,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="border-b">
+    <nav className="px-4 border-b bg-background">
       <div className="flex h-16 items-center px-4 container mx-auto">
         <div className="flex items-center space-x-2">
           <Video className="h-6 w-6" />
