@@ -105,7 +105,7 @@ export default function BookCall() {
             });
           }
         },
-        accepted: (developer: string, client: string, requestId: number) => {
+        accepted: (developer: string, client: string, requestId: number, roomId: string) => {
           if (client.toLowerCase() === userAddress?.toLowerCase() || 
               developer.toLowerCase() === userAddress?.toLowerCase()) {
             toast.success("Call Accepted", {
