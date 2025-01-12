@@ -1,6 +1,6 @@
 import { ethers } from "ethers"
 
-const CONTRACT_ADDRESS = "0xD371d65eeAaf858C39bbd8A6Ae69264F6CF56c9c"
+const CONTRACT_ADDRESS = "0x2Be976bb6DC8Fe1C470008315501c253AFa19f44"
 
 const CONTRACT_ABI = [
   // Events

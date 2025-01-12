@@ -9,8 +9,10 @@ import { Toaster, toast } from 'sonner'
 import { IncomingCallDialog } from "@/components/incoming-call-dialog"
 import { ethers } from "ethers"
 import { Developer, getAllDevelopers, getContract, bookCall, respondToCallRequest } from "@/lib/contract"
+import { useRouter } from "next/navigation"
 
 export default function BookCall() {
+  const router = useRouter()
   const [developers, setDevelopers] = useState<Developer[]>([])
   const [loading, setLoading] = useState(true)
   const [showCall, setShowCall] = useState(false)
@@ -103,14 +105,24 @@ export default function BookCall() {
             });
           }
         },
-        accepted: (developer: string, client: string) => {
-          if (client.toLowerCase() === userAddress?.toLowerCase()) {
+        accepted: (developer: string, client: string, requestId: number) => {
+          if (client.toLowerCase() === userAddress?.toLowerCase() || 
+              developer.toLowerCase() === userAddress?.toLowerCase()) {
             toast.success("Call Accepted", {
-              description: "Redirecting to call room..."
+              description: "Redirecting to video call..."
             });
+            
+            // Dismiss any waiting toasts
+            toast.dismiss('waiting-toast');
+            toast.dismiss(`call-request-${requestId}`);
+            
+            // Redirect to video call room
+            setTimeout(() => {
+              router.push(`/call/${requestId}`);
+            }, 1500);
           }
         },
-        rejected: (developer: string, client: string) => {
+        rejected: (developer: string, client: string, requestId: number) => {
           if (client.toLowerCase() === userAddress?.toLowerCase()) {
             toast.error("Call Rejected", {
               description: "Your payment will be refunded."
@@ -151,7 +163,7 @@ export default function BookCall() {
         eventCleanup();
       }
     };
-  }, []); // Empty dependency array
+  }, [router]); // Add router to dependencies
 
   const handleBooking = async (developerId: number) => {
     // First check if MetaMask is installed

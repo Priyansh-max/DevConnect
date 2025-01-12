@@ -32,7 +32,7 @@ contract DevConnect {
     event CallCompleted(uint256 callId, uint256 duration);
     event AvailabilityToggled(address indexed developer, bool isAvailable);
     event CallRequested(address indexed developer, address indexed client, uint256 requestId);
-    event CallAccepted(address indexed developer, address indexed client, uint256 requestId);
+    event CallAccepted(address indexed developer, address indexed client, uint256 requestId, string roomId);
     event CallRejected(address indexed developer, address indexed client, uint256 requestId);
 
     function registerDeveloper(string memory _name, string memory _expertise, uint256 _hourlyRate) public {
@@ -119,9 +119,9 @@ contract DevConnect {
         request.accepted = _accept;
         
         if (_accept) {
-            emit CallAccepted(msg.sender, request.client, _requestId);
+            string memory roomId = string(abi.encodePacked("room-", _requestId));
+            emit CallAccepted(msg.sender, request.client, _requestId, roomId);
         } else {
-            // Refund the client if rejected
             payable(request.client).transfer(request.amount);
             emit CallRejected(msg.sender, request.client, _requestId);
         }
