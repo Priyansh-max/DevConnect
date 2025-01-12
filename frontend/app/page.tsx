@@ -18,7 +18,7 @@ export default function Home() {
       // const response = await fetch(`/api/check-developer/${address}`)
       // const data = await response.json()
       // return data.isDeveloper
-      return false // Placeholder: replace with actual check
+      return true // Placeholder: replace with actual check
     } catch (error) {
       console.error("Error checking developer status:", error)
       return false
@@ -45,54 +45,22 @@ export default function Home() {
 
       console.log(accounts);
       if (accounts.length === 0) {
-        // If wallet not connected, show connect wallet message
-        toast('Connect Wallet', {
-          description: 'Please connect your MetaMask wallet to continue.',
-          action: {
-            label: 'Connect',
-            onClick: async () => {
-              try {
-                setIsConnecting(true)
-                // Show connecting toast
-                toast.promise(provider.send("eth_requestAccounts", []), {
-                  loading: 'Connecting to wallet...',
-                  success: async (accounts) => {
-                    // After connection, check if developer
-                    const isDeveloper = await checkIfDeveloper(accounts[0])
-                    if (isDeveloper) {
-                      toast.error('Account Exists', {
-                        description: 'This wallet is already registered as a developer.'
-                      })
-                    } else {
-                      router.push('/developer')
-                      console.log("hiii22")
-                      return 'Wallet connected successfully!'
-                    }
-                  },
-                  error: 'Failed to connect wallet. Please try again.',
-                })
-              } catch (error) {
-                console.error("Error:", error)
-                toast.error('Connection Failed', {
-                  description: 'Please make sure your wallet is unlocked and try again.'
-                })
-              } finally {
-                setIsConnecting(false)
-              }
-            }
-          },
+        // If wallet not connected, show simple toast message
+        toast.error('Wallet Not Connected', {
+          description: 'Please connect your wallet using the button in the navigation bar.'
+        });
+        return;
+      }
+
+      // Wallet is connected, check if developer
+      const isDeveloper = await checkIfDeveloper(accounts[0])
+      if (isDeveloper) {
+        toast.error('Account Exists', {
+          description: 'This wallet is already registered as a developer.'
         })
       } else {
-        // Wallet is connected, check if developer
-        const isDeveloper = await checkIfDeveloper(accounts[0])
-        if (isDeveloper) {
-          toast.error('Account Exists', {
-            description: 'This wallet is already registered as a developer.'
-          })
-        } else {
-          router.push('/developer')
-          console.log("hiii1")
-        }
+        router.push('/developer')
+        console.log("hiii1")
       }
       
     } catch (error) {

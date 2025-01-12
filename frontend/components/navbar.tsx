@@ -30,6 +30,58 @@ export default function Navbar() {
   // Add this state to track developer status
   const [isDeveloper, setIsDeveloper] = useState(false)
 
+  // Add this useEffect to check connection status on mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        if (typeof window.ethereum !== 'undefined') {
+          const provider = new ethers.BrowserProvider(window.ethereum)
+          const accounts = await provider.listAccounts()
+          
+          if (accounts.length > 0) {
+            toast.success("Wallet Connected")
+            const address = await accounts[0].getAddress()
+            setAddress(address)
+            setIsConnected(true)
+            
+            // Get wallet balance
+            const balance = await provider.getBalance(address)
+            setBalance(ethers.formatEther(balance))
+            
+            // Check if developer
+            checkIfDeveloper(address)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking connection:", error)
+      }
+    }
+
+    checkConnection()
+
+    // Listen for account changes
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts: string[]) => {
+        if (accounts.length === 0) {
+          // User disconnected
+          setIsConnected(false)
+          setAddress("")
+          setBalance("0")
+        } else {
+          // Account changed
+          checkConnection()
+        }
+      })
+    }
+
+    return () => {
+      // Cleanup listeners
+      if (window.ethereum) {
+        window.ethereum.removeAllListeners('accountsChanged')
+      }
+    }
+  }, [])
+
   const connectWallet = async () => {
     try {
       if (typeof window.ethereum !== 'undefined') {
@@ -72,6 +124,8 @@ export default function Navbar() {
       console.error("Error checking developer status:", error)
     }
   }
+
+  
 
   return (
     <nav className="px-4 border-b bg-background">
@@ -128,25 +182,13 @@ export default function Navbar() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/developer" className="flex items-center">
+                      <Link href="/dashboard/profile" className="flex items-center">
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Edit Profile</span>
                       </Link>
                     </DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuItem 
-                  className="text-red-600 focus:text-red-600"
-                  onClick={() => {
-                    setIsConnected(false)
-                    setAddress("")
-                    setBalance("0")
-                    setIsDeveloper(false)
-                  }}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Disconnect</span>
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
