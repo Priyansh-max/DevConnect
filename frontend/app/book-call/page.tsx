@@ -177,30 +177,32 @@ export default function BookCall() {
       return;
     }
 
-    // Check if user has sufficient balance
-    const balance = await provider.getBalance(accounts[0])
     const dev = developers.find(d => d.walletAddress === developers[developerId].walletAddress)
     if (dev) {
-      // const requiredAmount = ethers.parseEther(dev.hourlyRate.toString())
-      // if (balance < requiredAmount) {
-      //   toast.error('Insufficient Funds', {
-      //     description: 'You do not have enough funds to book this call.'
-      //   })
-      //   return
-      // }
-
-      // Proceed with booking if wallet is connected and balance is sufficient
       try {
-        await bookCall(dev.walletAddress, ethers.formatEther(dev.hourlyRate.toString()))
+        // Show loading toast
+        toast.loading('Booking Call...', {
+          description: 'Please confirm the transaction in your wallet',
+          duration: Infinity,
+          id: 'booking-toast'
+        });
 
-        toast.success('Call Booked', {
-          description: 'Please wait for the call notification.'
-        })
+        await bookCall(dev.walletAddress, ethers.formatEther(dev.hourlyRate.toString()));
+        
+        // Update toast after transaction is sent
+        toast.dismiss('booking-toast');
+        toast.success('Transaction Sent', {
+          description: 'Waiting for developer to accept...',
+          duration: Infinity,
+          id: 'waiting-toast'
+        });
+
       } catch (error: any) {
-        console.error("Error booking call:", error)
+        toast.dismiss('booking-toast');
+        console.error("Error booking call:", error);
         toast.error('Booking Failed', {
           description: error.message || 'Unknown error occurred'
-        })
+        });
       }
     }
   }
