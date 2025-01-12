@@ -40,52 +40,43 @@ export default function BecomeDeveloper() {
     try {
       setIsSubmitting(true)
       
-      // Convert hourly rate to Wei (assuming it's in ETH)
-      const hourlyRateInWei = ethers.parseEther(values.hourlyRate)
-      
-      // Call registerDeveloper and wait for transaction
+      toast({
+        title: "Initiating Transaction",
+        description: "Please confirm the transaction in your wallet...",
+      })
+
       const tx = await registerDeveloper(
         values.name,
         values.expertise,
-        hourlyRateInWei.toString()
+        values.hourlyRate
       )
 
-      // Show pending toast
       toast({
-        title: "Transaction Pending",
-        description: "Please wait while your transaction is being processed...",
+        title: "Transaction Sent",
+        description: "Your registration is being processed...",
       })
 
-      // Wait for transaction to be mined
-      const receipt = await tx.wait()
-      
-      if (receipt.status === 1) {
+      try {
+        const receipt = await tx.wait()
         toast({
           title: "Success!",
           description: "You are now registered as a developer.",
         })
         router.push("/book-call")
-      } else {
-        throw new Error("Transaction failed")
+      } catch (waitError: any) {
+        console.error("Transaction failed:", waitError)
+        toast({
+          title: "Transaction Failed",
+          description: "The registration transaction failed to complete.",
+          variant: "destructive",
+        })
       }
       
     } catch (error: any) {
       console.error("Error registering developer:", error)
-      
-      // More specific error messages based on the error type
-      let errorMessage = "Failed to register. Please try again."
-      
-      if (error.code === 'ACTION_REJECTED') {
-        errorMessage = "Transaction was rejected. Please try again."
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        errorMessage = "Insufficient funds to complete the transaction."
-      } else if (error.data?.message) {
-        errorMessage = error.data.message
-      }
-
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message || "Failed to register. Please try again.",
         variant: "destructive",
       })
     } finally {

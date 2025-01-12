@@ -115,10 +115,9 @@ export default function Navbar() {
   // Add this function to check developer status
   const checkIfDeveloper = async (address: string) => {
     try {
-      const contract = await getContract();
-      const isRegistered = await contract.isDeveloper(address);
-      console.log("Developer check:", { address, isRegistered });
-      setIsDeveloper(isRegistered);
+      const details = await getDeveloperDetails(address);
+      console.log("Developer check:", { address, isRegistered: details.isRegistered });
+      setIsDeveloper(details.isRegistered);
     } catch (error) {
       console.error("Error checking developer status:", error);
       setIsDeveloper(false);

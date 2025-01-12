@@ -24,9 +24,7 @@ export default function BookCall() {
         console.log("Fetched developers:", devs);
         
         const formattedDevs = devs.map(dev => ({
-          name: dev.name,
-          expertise: dev.expertise,
-          hourlyRate: dev.hourlyRate,
+          ...dev,
           walletAddress: dev.walletAddress,
           isAvailable: dev.isAvailable
         }));

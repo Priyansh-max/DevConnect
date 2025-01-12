@@ -1,5 +1,24 @@
 import { ethers } from "ethers"
-import DevConnectABI from "@/artifacts/contracts/DevConnect.sol/DevConnect.json"
+
+const CONTRACT_ADDRESS = "0x9C5739960634736Fbe3311c04392D1C014D0f293"
+
+const CONTRACT_ABI = [
+  // Events
+  "event DeveloperRegistered(address indexed developer, string name, string expertise, uint256 hourlyRate)",
+  "event CallBooked(address indexed developer, address indexed client, uint256 amount)",
+  "event CallCompleted(uint256 callId, uint256 duration)",
+  "event AvailabilityToggled(address indexed developer, bool isAvailable)",
+
+  // Functions
+  "function registerDeveloper(string memory _name, string memory _expertise, uint256 _hourlyRate)",
+  "function getDeveloperCount() view returns (uint256)",
+  "function getDeveloperAddress(uint256 _index) view returns (address)",
+  "function getDeveloperDetails(address _developer) view returns (string memory name, string memory expertise, uint256 hourlyRate, bool isAvailable, bool isRegistered)",
+  "function bookCall(address _developer) payable",
+  "function completeCall(uint256 _callId, uint256 _duration)",
+  "function toggleAvailability()",
+  "function developers(address) view returns (string name, string expertise, uint256 hourlyRate, bool isAvailable, bool isRegistered)"
+]
 
 interface DevConnectContract extends ethers.BaseContract {
   registerDeveloper(name: string, expertise: string, hourlyRate: bigint): Promise<any>;
@@ -7,12 +26,9 @@ interface DevConnectContract extends ethers.BaseContract {
   getDeveloperCount(): Promise<number>;
   getDeveloperAddress(index: number): Promise<string>;
   getDeveloperDetails(address: string): Promise<[string, string, bigint, boolean, boolean]>;
-  isDeveloper(address: string): Promise<boolean>;
   completeCall(callId: number, duration: number): Promise<any>;
   toggleAvailability(): Promise<any>;
 }
-
-const CONTRACT_ADDRESS = "0xcc44263A5bc5EdABDcC6734bf7f10E01e0Ffd51C"
 
 export interface Developer {
   name: string;
@@ -20,6 +36,7 @@ export interface Developer {
   hourlyRate: bigint;
   walletAddress: string;
   isAvailable: boolean;
+  isRegistered: boolean;
 }
 
 export async function getContract(withSigner = false): Promise<DevConnectContract> {
@@ -30,7 +47,7 @@ export async function getContract(withSigner = false): Promise<DevConnectContrac
   const provider = new ethers.BrowserProvider(window.ethereum)
   const contract = new ethers.Contract(
     CONTRACT_ADDRESS,
-    DevConnectABI.abi,
+    CONTRACT_ABI,
     provider
   ) as unknown as DevConnectContract
 
@@ -45,20 +62,12 @@ export async function getContract(withSigner = false): Promise<DevConnectContrac
 export async function registerDeveloper(name: string, expertise: string, hourlyRate: string) {
   try {
     const contract = await getContract(true)
-    console.log("Contract instance created")
-    
     const rateInWei = ethers.parseEther(hourlyRate)
-    console.log("Rate in Wei:", rateInWei.toString())
-    
     const tx = await contract.registerDeveloper(name, expertise, rateInWei)
-    console.log("Transaction sent:", tx.hash)
-    
-    const receipt = await tx.wait()
-    console.log("Transaction confirmed:", receipt)
-    return receipt
-  } catch (error) {
-    console.error("Error in registerDeveloper:", error)
-    throw error
+    return tx
+  } catch (error: any) {
+    console.error("Contract error:", error)
+    throw new Error(error.message || "Failed to register developer")
   }
 }
 
@@ -70,7 +79,7 @@ export async function bookCall(developerAddress: string, amount: string) {
   return tx.wait()
 }
 
-export async function getDeveloperDetails(address: string) {
+export async function getDeveloperDetails(address: string): Promise<Developer> {
   const contract = await getContract();
   const [name, expertise, hourlyRate, isAvailable, isRegistered] = await contract.getDeveloperDetails(address);
   return {
@@ -78,8 +87,9 @@ export async function getDeveloperDetails(address: string) {
     expertise,
     hourlyRate,
     walletAddress: address,
-    isAvailable
-  } as Developer;
+    isAvailable,
+    isRegistered
+  };
 }
 
 export async function completeCall(callId: number, duration: number) {
@@ -97,44 +107,31 @@ export async function toggleAvailability() {
 export async function getAllDevelopers(): Promise<Developer[]> {
   const contract = await getContract();
   try {
-    console.log("Using contract:", CONTRACT_ADDRESS);
-
     const count = await contract.getDeveloperCount();
-    console.log("Total developers count:", count.toString());
     const developers: Developer[] = [];
 
     for (let i = 0; i < count; i++) {
       try {
         const address = await contract.getDeveloperAddress(i);
-        console.log(`Checking developer ${i}:`, address);
-
-        const isRegistered = await contract.isDeveloper(address);
-        console.log(`Is registered:`, isRegistered);
+        const [name, expertise, hourlyRate, isAvailable, isRegistered] = 
+          await contract.getDeveloperDetails(address);
         
-        if (isRegistered) {
-          const details = await contract.getDeveloperDetails(address);
-          console.log(`Developer details:`, details);
-          
-          const [name, expertise, hourlyRate, isAvailable] = details;
-          console.log(`Parsed details:`, { name, expertise, hourlyRate: hourlyRate.toString(), isAvailable });
-          
-          if (isAvailable) {
-            developers.push({
-              name,
-              expertise,
-              hourlyRate,
-              walletAddress: address,
-              isAvailable
-            });
-          }
-        }
+        console.log('Raw hourlyRate:', hourlyRate.toString());
+        
+        developers.push({
+          name,
+          expertise,
+          hourlyRate,
+          walletAddress: address,
+          isAvailable,
+          isRegistered
+        });
       } catch (error) {
         console.error(`Error processing developer ${i}:`, error);
         continue;
       }
     }
 
-    console.log("Final available developers:", developers);
     return developers;
   } catch (error: any) {
     console.error("Error in getAllDevelopers:", error);
