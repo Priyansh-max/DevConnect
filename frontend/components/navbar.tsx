@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Condiment } from "next/font/google";
+import { getDeveloperDetails, getContract } from "@/lib/contract"
 
 export default function Navbar() {
   const [address, setAddress] = useState("")
@@ -113,15 +114,13 @@ export default function Navbar() {
 
   // Add this function to check developer status
   const checkIfDeveloper = async (address: string) => {
-    // Replace this with your actual API call or contract interaction
-    // For now, it's just a placeholder
     try {
-      // const response = await fetch(`/api/check-developer/${address}`)
-      // const data = await response.json()
-      // setIsDeveloper(data.isDeveloper)
-      setIsDeveloper(true) // Replace this with actual check
+      const details = await getDeveloperDetails(address);
+      console.log("Developer check:", { address, isRegistered: details.isRegistered });
+      setIsDeveloper(details.isRegistered);
     } catch (error) {
-      console.error("Error checking developer status:", error)
+      console.error("Error checking developer status:", error);
+      setIsDeveloper(false);
     }
   }
 
@@ -182,7 +181,7 @@ export default function Navbar() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard/profile" className="flex items-center">
+                      <Link href="/developer" className="flex items-center">
                         <Settings className="mr-2 h-4 w-4" />
                         <span>Edit Profile</span>
                       </Link>

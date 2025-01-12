@@ -7,18 +7,17 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { ethers } from "ethers"
 import { Toaster, toast } from 'sonner'
+import { getDeveloperDetails } from "@/lib/contract"
 
 export default function Home() {
   const router = useRouter()
   const [isConnecting, setIsConnecting] = useState(false)
 
   const checkIfDeveloper = async (address: string) => {
-    // Replace this with your actual API call to check if the address is a developer
     try {
-      // const response = await fetch(`/api/check-developer/${address}`)
-      // const data = await response.json()
-      // return data.isDeveloper
-      return true // Placeholder: replace with actual check
+      const details = await getDeveloperDetails(address)
+      // If the developer exists, their name will be non-empty
+      return details && details.name !== ""
     } catch (error) {
       console.error("Error checking developer status:", error)
       return false
