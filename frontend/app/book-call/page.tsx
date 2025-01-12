@@ -118,7 +118,7 @@ export default function BookCall() {
             
             // Redirect to video call room
             setTimeout(() => {
-              router.push(`/call/${requestId}`);
+              // router.push(`/call/${requestId}`);
             }, 1500);
           }
         },
