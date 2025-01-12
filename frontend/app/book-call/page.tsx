@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, Star, Video } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Toaster, toast } from 'sonner'
+import { IncomingCallDialog } from "@/components/incoming-call-dialog"
+import { ethers } from "ethers"
 
 // In a real app, this would come from your backend
 const onlineDevelopers = [
@@ -32,18 +34,55 @@ const onlineDevelopers = [
 ]
 
 export default function BookCall() {
-  const { toast } = useToast()
   const [developers, setDevelopers] = useState(onlineDevelopers)
+  const [showCall, setShowCall] = useState(false)
+  const [currentCaller, setCurrentCaller] = useState("")
 
-  const handleBooking = (developerId: number) => {
-    toast({
-      title: "Booking initiated",
-      description: "Please connect your wallet to continue with the booking.",
-    })
+  const handleBooking = async (developerId: number) => {
+    // First check if MetaMask is installed
+    if (typeof window.ethereum === 'undefined') {
+      toast.error('MetaMask Required', {
+        description: 'Please install MetaMask to continue.',
+        action: {
+          label: 'Install',
+          onClick: () => window.open('https://metamask.io/download/', '_blank')
+        },
+      })
+      return
+    }
+
+    // Check if wallet is connected
+    const provider = new ethers.BrowserProvider(window.ethereum)
+    const accounts = await provider.listAccounts()
+    
+    if (accounts.length === 0) {
+      toast.error('Wallet Not Connected', {
+        description: 'Please connect your wallet using the button in the navigation bar.'
+      });
+      return;
+    }
+
+    // Proceed with booking if wallet is connected
+    const dev = developers.find(d => d.id === developerId)
+    if (dev) {
+      setCurrentCaller(dev.name)
+      setShowCall(true)
+    }
   }
 
   return (
     <main className="container mx-auto py-8">
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: 'var(--background)',
+            color: 'var(--foreground)',
+            border: '1px solid var(--border)',
+          },
+          className: 'dark:bg-gray-800 dark:text-white',
+        }}
+      />
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-4">Available Developers</h1>
         <p className="text-muted-foreground">
@@ -119,6 +158,23 @@ export default function BookCall() {
           </p>
         </div>
       )}
+
+      <IncomingCallDialog
+        isOpen={showCall}
+        onAccept={() => {
+          setShowCall(false)
+          toast.success("Call Accepted", {
+            description: "Redirecting to call room..."
+          })
+        }}
+        onReject={() => {
+          setShowCall(false)
+          toast.error("Call Rejected", {
+            description: "The developer is currently unavailable."
+          })
+        }}
+        callerName={currentCaller}
+      />
     </main>
   )
 }
