@@ -8,7 +8,7 @@ import { Calendar, Clock, Star, Video } from "lucide-react"
 import { Toaster, toast } from 'sonner'
 import { IncomingCallDialog } from "@/components/incoming-call-dialog"
 import { ethers } from "ethers"
-import { Developer, getAllDevelopers, getContract, bookCall } from "@/lib/contract"
+import { Developer, getAllDevelopers, getContract, bookCall, respondToCallRequest } from "@/lib/contract"
 
 export default function BookCall() {
   const [developers, setDevelopers] = useState<Developer[]>([])
@@ -41,34 +41,87 @@ export default function BookCall() {
       }
     };
 
-    const listenForCallBooked = async () => {
+    const listenForCallEvents = async () => {
       const contract = await getContract();
-      const checkForEvents = () => {
-        contract.on("CallBooked", (developer, client, amount) => {
-          console.log("CallBooked event detected:", { developer, client, amount });
-          const dev = developers.find(d => d.walletAddress === developer);
-          if (dev) {
-            setCurrentDeveloper(dev);
-            setShowCall(true);
-            toast.success(`Call booked with ${dev.name}`, {
-              description: "Please join the call."
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.listAccounts();
+      const userAddress = accounts[0]?.address;
+      
+      // Store event handlers for cleanup
+      const handlers = {
+        requested: (developer: string, client: string, requestId: number) => {
+          console.log("Call requested:", { developer, client, requestId });
+          if (developer.toLowerCase() === userAddress?.toLowerCase()) {
+            toast(
+              <div className="flex flex-col gap-2">
+                <div className="font-semibold">New Call Request</div>
+                <div>{client} wants to book a call</div>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    variant="default" 
+                    onClick={async () => {
+                      try {
+                        await respondToCallRequest(requestId, true);
+                        toast("Call accepted successfully");
+                      } catch (error) {
+                        toast("Failed to accept call");
+                      }
+                    }}
+                  >
+                    Accept
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={async () => {
+                      try {
+                        await respondToCallRequest(requestId, false);
+                        toast("Call rejected");
+                      } catch (error) {
+                        toast("Failed to reject call");
+                      }
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            );
+          }
+        },
+        accepted: (developer: string, client: string) => {
+          if (client.toLowerCase() === userAddress?.toLowerCase()) {
+            toast.success("Call Accepted", {
+              description: "Redirecting to call room..."
             });
           }
-        });
+        },
+        rejected: (developer: string, client: string) => {
+          if (client.toLowerCase() === userAddress?.toLowerCase()) {
+            toast.error("Call Rejected", {
+              description: "Your payment will be refunded."
+            });
+          }
+        }
       };
 
-      checkForEvents();
-      const intervalId = setInterval(checkForEvents, 10000); // Check every 10 seconds
+      contract.on("CallRequested", handlers.requested);
+      contract.on("CallAccepted", handlers.accepted);
+      contract.on("CallRejected", handlers.rejected);
 
       return () => {
-        clearInterval(intervalId);
-        contract.off("CallBooked");
+        contract.off("CallRequested", handlers.requested);
+        contract.off("CallAccepted", handlers.accepted);
+        contract.off("CallRejected", handlers.rejected);
       };
     };
 
-    listenForCallBooked();
     fetchDevelopers();
-  }, []);
+    const cleanup = listenForCallEvents();
+    
+    return () => {
+      if (cleanup) cleanup.then(fn => fn());
+    };
+  }, []); // Remove developers from dependency array
 
   const handleBooking = async (developerId: number) => {
     // First check if MetaMask is installed

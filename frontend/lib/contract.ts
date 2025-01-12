@@ -1,6 +1,6 @@
 import { ethers } from "ethers"
 
-const CONTRACT_ADDRESS = "0x75f44062c652A93e8dF395E9676c3761402241FF"
+const CONTRACT_ADDRESS = "0xD371d65eeAaf858C39bbd8A6Ae69264F6CF56c9c"
 
 const CONTRACT_ABI = [
   // Events
@@ -8,6 +8,9 @@ const CONTRACT_ABI = [
   "event CallBooked(address indexed developer, address indexed client, uint256 amount)",
   "event CallCompleted(uint256 callId, uint256 duration)",
   "event AvailabilityToggled(address indexed developer, bool isAvailable)",
+  "event CallRequested(address indexed developer, address indexed client, uint256 requestId)",
+  "event CallAccepted(address indexed developer, address indexed client, uint256 requestId)",
+  "event CallRejected(address indexed developer, address indexed client, uint256 requestId)",
 
   // Functions
   "function registerDeveloper(string memory _name, string memory _expertise, uint256 _hourlyRate)",
@@ -17,7 +20,8 @@ const CONTRACT_ABI = [
   "function bookCall(address _developer) payable",
   "function completeCall(uint256 _callId, uint256 _duration)",
   "function toggleAvailability()",
-  "function developers(address) view returns (string name, string expertise, uint256 hourlyRate, bool isAvailable, bool isRegistered)"
+  "function developers(address) view returns (string name, string expertise, uint256 hourlyRate, bool isAvailable, bool isRegistered)",
+  "function respondToCallRequest(uint256 _requestId, bool _accept)"
 ]
 
 interface DevConnectContract extends ethers.BaseContract {
@@ -28,6 +32,7 @@ interface DevConnectContract extends ethers.BaseContract {
   getDeveloperDetails(address: string): Promise<[string, string, bigint, boolean, boolean]>;
   completeCall(callId: number, duration: number): Promise<any>;
   toggleAvailability(): Promise<any>;
+  respondToCallRequest(requestId: number, accept: boolean): Promise<any>;
 }
 
 export interface Developer {
@@ -137,4 +142,10 @@ export async function getAllDevelopers(): Promise<Developer[]> {
     console.error("Error in getAllDevelopers:", error);
     throw new Error(error.message || "Failed to load developers");
   }
+}
+
+export async function respondToCallRequest(requestId: number, accept: boolean) {
+  const contract = await getContract(true);
+  const tx = await contract.respondToCallRequest(requestId, accept);
+  return tx.wait();
 } 

@@ -10,17 +10,30 @@ contract DevConnect {
         bool isRegistered;
     }
 
+    struct CallRequest {
+        address client;
+        uint256 amount;
+        bool accepted;
+        bool responded;
+    }
+
     // Array to keep track of all developer addresses
     address[] public developerAddresses;
     
     // Mapping of address to Developer struct
     mapping(address => Developer) public developers;
 
+    // Mapping developer address to their pending call requests
+    mapping(address => CallRequest[]) public callRequests;
+    
     // Events
     event DeveloperRegistered(address indexed developer, string name, string expertise, uint256 hourlyRate);
     event CallBooked(address indexed developer, address indexed client, uint256 amount);
     event CallCompleted(uint256 callId, uint256 duration);
     event AvailabilityToggled(address indexed developer, bool isAvailable);
+    event CallRequested(address indexed developer, address indexed client, uint256 requestId);
+    event CallAccepted(address indexed developer, address indexed client, uint256 requestId);
+    event CallRejected(address indexed developer, address indexed client, uint256 requestId);
 
     function registerDeveloper(string memory _name, string memory _expertise, uint256 _hourlyRate) public {
         require(!developers[msg.sender].isRegistered, "Developer already registered");
@@ -75,7 +88,15 @@ contract DevConnect {
         require(developers[_developer].isAvailable, "Developer not available");
         require(msg.value > 0, "Payment required");
         
-        emit CallBooked(_developer, msg.sender, msg.value);
+        uint256 requestId = callRequests[_developer].length;
+        callRequests[_developer].push(CallRequest({
+            client: msg.sender,
+            amount: msg.value,
+            accepted: false,
+            responded: false
+        }));
+        
+        emit CallRequested(_developer, msg.sender, requestId);
     }
 
     function completeCall(uint256 _callId, uint256 _duration) public {
@@ -87,5 +108,22 @@ contract DevConnect {
         require(developers[msg.sender].isRegistered, "Developer not registered");
         developers[msg.sender].isAvailable = !developers[msg.sender].isAvailable;
         emit AvailabilityToggled(msg.sender, developers[msg.sender].isAvailable);
+    }
+
+    function respondToCallRequest(uint256 _requestId, bool _accept) public {
+        require(_requestId < callRequests[msg.sender].length, "Invalid request ID");
+        CallRequest storage request = callRequests[msg.sender][_requestId];
+        require(!request.responded, "Already responded");
+        
+        request.responded = true;
+        request.accepted = _accept;
+        
+        if (_accept) {
+            emit CallAccepted(msg.sender, request.client, _requestId);
+        } else {
+            // Refund the client if rejected
+            payable(request.client).transfer(request.amount);
+            emit CallRejected(msg.sender, request.client, _requestId);
+        }
     }
 } 
