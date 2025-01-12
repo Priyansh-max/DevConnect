@@ -11,6 +11,10 @@ module.exports = {
       chainId: 1993,
       timeout: 60000,
       gasPrice: "auto"
+    },
+    polygon: {
+      url: process.env.NEXT_PUBLIC_RPC_URL,
+      accounts: [process.env.PRIVATE_KEY]
     }
   }
 }; 

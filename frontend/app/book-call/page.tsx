@@ -8,13 +8,14 @@ import { Calendar, Clock, Star, Video } from "lucide-react"
 import { Toaster, toast } from 'sonner'
 import { IncomingCallDialog } from "@/components/incoming-call-dialog"
 import { ethers } from "ethers"
-import { Developer, getAllDevelopers } from "@/lib/contract"
+import { Developer, getAllDevelopers, getContract, bookCall } from "@/lib/contract"
 
 export default function BookCall() {
   const [developers, setDevelopers] = useState<Developer[]>([])
   const [loading, setLoading] = useState(true)
   const [showCall, setShowCall] = useState(false)
   const [currentCaller, setCurrentCaller] = useState("")
+  const [currentDeveloper, setCurrentDeveloper] = useState<Developer | null>(null)
 
   useEffect(() => {
     const fetchDevelopers = async () => {
@@ -40,6 +41,32 @@ export default function BookCall() {
       }
     };
 
+    const listenForCallBooked = async () => {
+      const contract = await getContract();
+      const checkForEvents = () => {
+        contract.on("CallBooked", (developer, client, amount) => {
+          console.log("CallBooked event detected:", { developer, client, amount });
+          const dev = developers.find(d => d.walletAddress === developer);
+          if (dev) {
+            setCurrentDeveloper(dev);
+            setShowCall(true);
+            toast.success(`Call booked with ${dev.name}`, {
+              description: "Please join the call."
+            });
+          }
+        });
+      };
+
+      checkForEvents();
+      const intervalId = setInterval(checkForEvents, 10000); // Check every 10 seconds
+
+      return () => {
+        clearInterval(intervalId);
+        contract.off("CallBooked");
+      };
+    };
+
+    listenForCallBooked();
     fetchDevelopers();
   }, []);
 
@@ -67,11 +94,31 @@ export default function BookCall() {
       return;
     }
 
-    // Proceed with booking if wallet is connected
+    // Check if user has sufficient balance
+    const balance = await provider.getBalance(accounts[0])
     const dev = developers.find(d => d.walletAddress === developers[developerId].walletAddress)
     if (dev) {
-      setCurrentCaller(dev.name)
-      setShowCall(true)
+      // const requiredAmount = ethers.parseEther(dev.hourlyRate.toString())
+      // if (balance < requiredAmount) {
+      //   toast.error('Insufficient Funds', {
+      //     description: 'You do not have enough funds to book this call.'
+      //   })
+      //   return
+      // }
+
+      // Proceed with booking if wallet is connected and balance is sufficient
+      try {
+        await bookCall(dev.walletAddress, ethers.formatEther(dev.hourlyRate.toString()))
+
+        toast.success('Call Booked', {
+          description: 'Please wait for the call notification.'
+        })
+      } catch (error: any) {
+        console.error("Error booking call:", error)
+        toast.error('Booking Failed', {
+          description: error.message || 'Unknown error occurred'
+        })
+      }
     }
   }
 
