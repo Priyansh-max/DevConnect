@@ -18,6 +18,9 @@ export default function BookCall() {
   const [currentDeveloper, setCurrentDeveloper] = useState<Developer | null>(null)
 
   useEffect(() => {
+    let isSubscribed = true;
+    let eventCleanup: (() => void) | null = null;
+
     const fetchDevelopers = async () => {
       try {
         setLoading(true);
@@ -41,7 +44,9 @@ export default function BookCall() {
       }
     };
 
-    const listenForCallEvents = async () => {
+    const listenForCallEvents = async (): Promise<(() => void) | null> => {
+      if (eventCleanup) return null;
+
       const contract = await getContract();
       const provider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await provider.listAccounts();
@@ -50,58 +55,52 @@ export default function BookCall() {
       // Store event handlers for cleanup
       const handlers = {
         requested: (developer: string, client: string, requestId: number) => {
+          if (!isSubscribed) return; // Don't process events if component is unmounted
           console.log("Call requested:", { developer, client, requestId });
           if (developer.toLowerCase() === userAddress?.toLowerCase()) {
-            toast.promise(
-              new Promise((resolve, reject) => {
-                toast(
-                  <div className="flex flex-col gap-2">
-                    <div className="font-semibold">New Call Request</div>
-                    <div>{client} wants to book a call</div>
-                    <div className="flex gap-2 mt-2">
-                      <Button 
-                        variant="default" 
-                        onClick={async () => {
-                          try {
-                            await respondToCallRequest(requestId, true);
-                            toast.dismiss();
-                            resolve("accepted");
-                            toast("Call accepted successfully");
-                          } catch (error) {
-                            reject(error);
-                            toast("Failed to accept call");
-                          }
-                        }}
-                      >
-                        Accept
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={async () => {
-                          try {
-                            await respondToCallRequest(requestId, false);
-                            toast.dismiss();
-                            resolve("rejected");
-                            toast("Call rejected");
-                          } catch (error) {
-                            reject(error);
-                            toast("Failed to reject call");
-                          }
-                        }}
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                ),
-                { duration: Infinity } // Make toast persistent
-              }),
-              {
-                loading: 'Waiting for response...',
-                success: (result) => `Call ${result}`,
-                error: 'Failed to process response'
-              }
+            // Developer view - show accept/reject buttons
+            toast(
+              <div className="flex flex-col gap-2">
+                <div className="font-semibold">New Call Request</div>
+                <div>{client} wants to book a call</div>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    variant="default" 
+                    onClick={async () => {
+                      try {
+                        await respondToCallRequest(requestId, true);
+                        toast.dismiss();
+                        toast("Call accepted successfully");
+                      } catch (error) {
+                        toast("Failed to accept call");
+                      }
+                    }}
+                  >
+                    Accept
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={async () => {
+                      try {
+                        await respondToCallRequest(requestId, false);
+                        toast.dismiss();
+                        toast("Call rejected");
+                      } catch (error) {
+                        toast("Failed to reject call");
+                      }
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </div>,
+              { duration: Infinity, id: `call-request-${requestId}` } // Add unique ID
             );
+          } else if (client.toLowerCase() === userAddress?.toLowerCase()) {
+            toast("Call Request Sent", {
+              description: "Waiting for developer to respond...",
+              id: `call-request-${requestId}` // Add unique ID
+            });
           }
         },
         accepted: (developer: string, client: string) => {
@@ -124,20 +123,35 @@ export default function BookCall() {
       contract.on("CallAccepted", handlers.accepted);
       contract.on("CallRejected", handlers.rejected);
 
-      return () => {
+      eventCleanup = () => {
         contract.off("CallRequested", handlers.requested);
         contract.off("CallAccepted", handlers.accepted);
         contract.off("CallRejected", handlers.rejected);
       };
+
+      return eventCleanup;
     };
 
-    fetchDevelopers();
-    const cleanup = listenForCallEvents();
-    
-    return () => {
-      if (cleanup) cleanup.then(fn => fn());
+    const fetchAndListen = async () => {
+      try {
+        await fetchDevelopers();
+        if (isSubscribed) {
+          eventCleanup = await listenForCallEvents();
+        }
+      } catch (error) {
+        console.error("Error in setup:", error);
+      }
     };
-  }, []); // Remove developers from dependency array
+
+    fetchAndListen();
+
+    return () => {
+      isSubscribed = false;
+      if (eventCleanup) {
+        eventCleanup();
+      }
+    };
+  }, []); // Empty dependency array
 
   const handleBooking = async (developerId: number) => {
     // First check if MetaMask is installed
