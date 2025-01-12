@@ -12,28 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { registerDeveloper } from "@/lib/contract"
+import { Loader2 } from "lucide-react"
+import { ethers } from "ethers"
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   expertise: z.string().min(2, "Expertise is required"),
   hourlyRate: z.string().min(1, "Hourly rate is required"),
-  about: z.string().min(50, "About section must be at least 50 characters"),
-  github: z.string().url("Must be a valid URL"),
-  yearsOfExperience: z.string(),
-  timezone: z.string(),
 })
-
-const timezones = [
-  "UTC-12:00", "UTC-11:00", "UTC-10:00", "UTC-09:00", "UTC-08:00", 
-  "UTC-07:00", "UTC-06:00", "UTC-05:00", "UTC-04:00", "UTC-03:00",
-  "UTC-02:00", "UTC-01:00", "UTC+00:00", "UTC+01:00", "UTC+02:00",
-  "UTC+03:00", "UTC+04:00", "UTC+05:00", "UTC+06:00", "UTC+07:00",
-  "UTC+08:00", "UTC+09:00", "UTC+10:00", "UTC+11:00", "UTC+12:00"
-]
-
-const experienceLevels = [
-  "1-2 years", "3-5 years", "5-7 years", "7-10 years", "10+ years"
-]
 
 export default function BecomeDeveloper() {
   const { toast } = useToast()
@@ -46,30 +33,59 @@ export default function BecomeDeveloper() {
       name: "",
       expertise: "",
       hourlyRate: "",
-      about: "",
-      github: "",
-      yearsOfExperience: "",
-      timezone: "",
     },
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setIsSubmitting(true)
-      // Here you would typically send the data to your backend
-      console.log(values)
       
+      // Convert hourly rate to Wei (assuming it's in ETH)
+      const hourlyRateInWei = ethers.parseEther(values.hourlyRate)
+      
+      // Call registerDeveloper and wait for transaction
+      const tx = await registerDeveloper(
+        values.name,
+        values.expertise,
+        hourlyRateInWei.toString()
+      )
+
+      // Show pending toast
       toast({
-        title: "Profile submitted!",
-        description: "Your developer profile has been created successfully.",
+        title: "Transaction Pending",
+        description: "Please wait while your transaction is being processed...",
       })
+
+      // Wait for transaction to be mined
+      const receipt = await tx.wait()
       
-      // Redirect to home page after successful submission
-      router.push("/")
-    } catch (error) {
+      if (receipt.status === 1) {
+        toast({
+          title: "Success!",
+          description: "You are now registered as a developer.",
+        })
+        router.push("/book-call")
+      } else {
+        throw new Error("Transaction failed")
+      }
+      
+    } catch (error: any) {
+      console.error("Error registering developer:", error)
+      
+      // More specific error messages based on the error type
+      let errorMessage = "Failed to register. Please try again."
+      
+      if (error.code === 'ACTION_REJECTED') {
+        errorMessage = "Transaction was rejected. Please try again."
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        errorMessage = "Insufficient funds to complete the transaction."
+      } else if (error.data?.message) {
+        errorMessage = error.data.message
+      }
+
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -108,10 +124,13 @@ export default function BecomeDeveloper() {
                 name="expertise"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Primary Expertise</FormLabel>
+                    <FormLabel>Expertise</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Full Stack Developer, Blockchain Expert" {...field} />
+                      <Input placeholder="e.g., Solidity, React, Node.js" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      List your main areas of expertise
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -124,95 +143,10 @@ export default function BecomeDeveloper() {
                   <FormItem>
                     <FormLabel>Hourly Rate (ETH)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.1" {...field} />
+                      <Input type="number" step="0.0001" placeholder="0.0001" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Set your hourly rate in ETH (e.g., 0.1 ETH)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="yearsOfExperience"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Years of Experience</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your experience level" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {experienceLevels.map((level) => (
-                          <SelectItem key={level} value={level}>
-                            {level}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="timezone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Timezone</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your timezone" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {timezones.map((timezone) => (
-                          <SelectItem key={timezone} value={timezone}>
-                            {timezone}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="github"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>GitHub Profile</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://github.com/yourusername" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="about"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>About You</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Tell us about your experience, skills, and what you can offer to clients..."
-                        className="h-32"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Minimum 50 characters. Describe your experience and what makes you unique.
+                      Set your hourly rate in ETH (e.g., 0.0001 ETH)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -220,7 +154,10 @@ export default function BecomeDeveloper() {
               />
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Submitting..." : "Submit Application"}
+                {isSubmitting ? 
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Registering...</> : 
+                  "Register as Developer"
+                }
               </Button>
             </form>
           </Form>

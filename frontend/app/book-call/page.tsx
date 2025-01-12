@@ -8,35 +8,42 @@ import { Calendar, Clock, Star, Video } from "lucide-react"
 import { Toaster, toast } from 'sonner'
 import { IncomingCallDialog } from "@/components/incoming-call-dialog"
 import { ethers } from "ethers"
-
-// In a real app, this would come from your backend
-const onlineDevelopers = [
-  {
-    id: 1,
-    name: "Alice Johnson",
-    expertise: "Full Stack Developer",
-    rate: "0.1 ETH/hour",
-    rating: 4.9,
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop",
-    timezone: "UTC+01:00",
-    isOnline: true
-  },
-  {
-    id: 2,
-    name: "Bob Smith",
-    expertise: "Blockchain Developer",
-    rate: "0.15 ETH/hour",
-    rating: 4.8,
-    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&h=200&auto=format&fit=crop",
-    timezone: "UTC-05:00",
-    isOnline: true
-  }
-]
+import { Developer, getAllDevelopers } from "@/lib/contract"
 
 export default function BookCall() {
-  const [developers, setDevelopers] = useState(onlineDevelopers)
+  const [developers, setDevelopers] = useState<Developer[]>([])
+  const [loading, setLoading] = useState(true)
   const [showCall, setShowCall] = useState(false)
   const [currentCaller, setCurrentCaller] = useState("")
+
+  useEffect(() => {
+    const fetchDevelopers = async () => {
+      try {
+        setLoading(true);
+        const devs = await getAllDevelopers();
+        console.log("Fetched developers:", devs);
+        
+        const formattedDevs = devs.map(dev => ({
+          name: dev.name,
+          expertise: dev.expertise,
+          hourlyRate: dev.hourlyRate,
+          walletAddress: dev.walletAddress,
+          isAvailable: dev.isAvailable
+        }));
+        
+        setDevelopers(formattedDevs);
+      } catch (error: any) {
+        console.error("Error in fetchDevelopers:", error);
+        toast.error("Failed to load developers", {
+          description: error.message || "Unknown error occurred"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDevelopers();
+  }, []);
 
   const handleBooking = async (developerId: number) => {
     // First check if MetaMask is installed
@@ -63,7 +70,7 @@ export default function BookCall() {
     }
 
     // Proceed with booking if wallet is connected
-    const dev = developers.find(d => d.id === developerId)
+    const dev = developers.find(d => d.walletAddress === developers[developerId].walletAddress)
     if (dev) {
       setCurrentCaller(dev.name)
       setShowCall(true)
@@ -90,67 +97,62 @@ export default function BookCall() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {developers.map((dev) => (
-          <Card key={dev.id} className="relative">
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-              </span>
-              <span className="text-sm text-muted-foreground">Online</span>
-            </div>
-
-            <CardHeader>
-              <div className="flex items-center gap-4">
-                <img
-                  src={dev.image}
-                  alt={dev.name}
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-                <div>
-                  <CardTitle className="text-xl">{dev.name}</CardTitle>
-                  <CardDescription>{dev.expertise}</CardDescription>
-                </div>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {developers.map((dev, index) => (
+            <Card key={dev.walletAddress} className="relative">
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <span className="text-sm text-muted-foreground">Online</span>
               </div>
-            </CardHeader>
 
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 text-yellow-400" />
-                    <span className="font-medium">{dev.rating}</span>
+              <CardHeader>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-r from-primary to-primary/50 flex items-center justify-center text-2xl font-bold text-white">
+                    {dev.name.charAt(0)}
                   </div>
-                  <Badge variant="secondary">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {dev.timezone}
-                  </Badge>
+                  <div>
+                    <CardTitle className="text-xl">{dev.name}</CardTitle>
+                    <CardDescription>{dev.expertise}</CardDescription>
+                  </div>
                 </div>
+              </CardHeader>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold">{dev.rate}</span>
-                  <Badge variant="outline">
-                    <Video className="h-3 w-3 mr-1" />
-                    Available Now
-                  </Badge>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-semibold">
+                      {ethers.formatEther(dev.hourlyRate)} ETH/hour
+                    </span>
+                    <Badge variant="outline">
+                      <Video className="h-3 w-3 mr-1" />
+                      Available Now
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
+              </CardContent>
 
-            <CardFooter>
-              <Button 
-                className="w-full" 
-                onClick={() => handleBooking(dev.id)}
-              >
-                Book a Call
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+              <CardFooter>
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleBooking(index)}
+                >
+                  Book a Call
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {developers.length === 0 && (
+      {!loading && developers.length === 0 && (
         <div className="text-center py-12">
           <h2 className="text-2xl font-semibold mb-2">No Developers Online</h2>
           <p className="text-muted-foreground">
